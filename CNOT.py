@@ -80,7 +80,7 @@ def Hmat(t,flat_p,t1):
     return V*H1 + 0.5 * omega * H2 - jnp.einsum('i,ijk->jk', delta, n0)
 
 @jit
-def loss(psi_init, t1,flat_p, psi0):
+def loss(t1,flat_p,psi_init,psi0):
     '''
     define the loss function, which is a pure function
     '''
@@ -95,16 +95,18 @@ def loss(psi_init, t1,flat_p, psi0):
     
     return (1 - jnp.abs(jnp.dot(jnp.conjugate(psi_final), psi0))**2)
 
-if __name__=='__main__':
-    psi_i = jnp.array([0,0,0,1],dtype=jnp.complex128)
-    psi_f = 1/jnp.sqrt(2)*jnp.array([0, 1, 1, 0], dtype=jnp.complex128)
-    t1 = 1.
-    flat_p = initial(key)
 
-    num_step = 300
-    learning_rate=1.0
+def qoptimize(H_func,psi_i,psi_f,init_param,num_step=300,learning_rate=1.0):
+    '''
+    Get the best possible parameter
+    H_func: Matrix form of Hamiltonian, should be called as H_func(t,flat_p,t1)
+    psi_i: initial wave function
+    psi_f: final wave function
+    init_param: initial parameters
+    '''
     opt_init, opt_update, get_params = optimizers.adam(learning_rate)  # Use adam optimizer
     loss_list = []
+
     def unpack(x):
                 # t , args
         return x[0], x[1:]
@@ -112,13 +114,14 @@ if __name__=='__main__':
     def step_fun(step, opt_state, psi, psi0):
         aug_params = get_params(opt_state)
         t1, flat_params = unpack(aug_params)
-        value, grads = jax.value_and_grad(loss, (1, 2))(psi, t1, flat_params, psi0)
+        value, grads = jax.value_and_grad(
+            loss, (0, 1))(t1, flat_params,psi, psi0)
         g_t, g_p = grads
         aug_grad = jnp.concatenate([jnp.array([g_t]), g_p])
         opt_state = opt_update(step, aug_grad, opt_state)
         return value, opt_state
 
-    aug_params = jnp.concatenate([jnp.array([t1]), flat_p])
+    aug_params = jnp.concatenate([jnp.array([t1]), init_param])
     opt_state = opt_init(aug_params)
 
     # optimize
@@ -126,9 +129,15 @@ if __name__=='__main__':
         value, opt_state = step_fun(step, opt_state, psi_i, psi_f)
         loss_list.append(value)
         print('step {0} : loss is {1}'.format(
-            step, value))
+            step, value), end="\r", flush=True)
     
-    plt.plot([x for x in range(num_step)], loss_list)
-    plt.show()
-    
+    print('final loss = ',value)
+    return value, unpack(get_params(opt_state))
+
+if __name__=='__main__':
+    psi_i = jnp.array([0,0,0,1],dtype=jnp.complex128)
+    psi_f = 1/jnp.sqrt(2)*jnp.array([0, 1, 1, 0], dtype=jnp.complex128)
+    t1 = 1.
+    flat_p = initial(key)
+    final_loss, res_state = qoptimize(Hmat,psi_i,psi_f,flat_p)
 

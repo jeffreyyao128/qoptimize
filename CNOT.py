@@ -130,5 +130,4 @@ if __name__=='__main__':
     
     plt.plot([x for x in range(num_step)], loss_list)
     plt.show()
-    
 

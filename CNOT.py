@@ -69,7 +69,7 @@ def Hmat(t,flat_p,t1):
     '''
     Using dense matrix to represent Hamiltonian
     '''
-    w = 2*jnp.pi/t1
+    w = jnp.pi/t1
     u_omega, u_d, V = unpackp(flat_p)
 
     ft = jnp.array([jnp.sin(w*(i+1)*t) for i in range(N1)])
@@ -96,7 +96,7 @@ def loss(t1,flat_p,psi_init,psi0):
     return (1 - jnp.abs(jnp.dot(jnp.conjugate(psi_final), psi0))**2)
 
 
-def qoptimize(H_func,psi_i,psi_f,init_param,num_step=300,learning_rate=1.0):
+def qoptimize(H_func,psi_i,psi_f,t1,init_param,num_step=300,learning_rate=1.0):
     '''
     Get the best possible parameter
     H_func: Matrix form of Hamiltonian, should be called as H_func(t,flat_p,t1)
@@ -131,12 +131,12 @@ def qoptimize(H_func,psi_i,psi_f,init_param,num_step=300,learning_rate=1.0):
         print('step {0} : loss is {1}'.format(
             step, value), end="\r", flush=True)
 
-    print('final loss = ',value)
-    return value, unpack(get_params(opt_state))
+    print('final loss = ',value,flush=True)
+    return loss_list, unpack(get_params(opt_state))
 
 if __name__=='__main__':
     psi_i = jnp.array([0,0,0,1],dtype=jnp.complex128)
     psi_f = 1/jnp.sqrt(2)*jnp.array([0, 1, 1, 0], dtype=jnp.complex128)
     t1 = 1.
     flat_p = initial(key)
-    final_loss, res_state = qoptimize(Hmat,psi_i,psi_f,flat_p)
+    final_loss, res_state = qoptimize(Hmat,psi_i,psi_f,t1,flat_p)
